@@ -1,0 +1,6 @@
+#family
+mom-мама
+dad-папа
+sister-сестра
+brother-брат
+son-сын

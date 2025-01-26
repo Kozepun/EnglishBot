@@ -1,0 +1,16 @@
+#Numbers
+one-один
+two-два
+three-три
+four-четыре
+five-пять
+six-шесть
+seven-семь
+eight-восемь
+#Words
+eat-есть
+sit-сидеть
+lay-лежать
+stay-стоять
+school-школа
+family-семья
