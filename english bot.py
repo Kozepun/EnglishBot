@@ -16,7 +16,11 @@ buttonText = [[]]
 
 inputEnabled = []
 
-BOT_TOKEN = "7291333533:AAGWqzo_a4xd3WQR7dBikfQPKQ-tucpKFCQ"
+with open("token.txt", encoding='utf-8', mode='r+') as file:
+    for line in file:
+        BOT_TOKEN = line
+
+
 bot = telebot.TeleBot(BOT_TOKEN)
 
 wordLists = []
