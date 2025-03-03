@@ -29,7 +29,12 @@ localizedMessage =[["обери категорію","выбери категор
                    ["ти точно хочеш видалити категорію","ты точно хочешь удалить категорию","are you sure you want to delete"],
                    ["неможливо знайти","невозможно найти","can\'t find"],
                    ["видалено","удалено","deleted"],
-                   ["вітаю","поздравляю","congratulations"]]
+                   ["вітаю","поздравляю","congratulations"],
+                   ["перегляд слів категорії","предпросмостр слов категории","preview of category"],
+                   ["підтвердити вибір","подтвердить выбор","confirm choice"],
+                   ["не правильно","не правильно","incorrect"],
+                   ["правильно","правильно","correct"],
+                   ["обери мову","выбери язык","choose language"]]
 
 localizedButtons = [["редактор категорій","редактор категорий","category editor"],
                     ["додати","добавить","add"],
@@ -39,7 +44,7 @@ localizedButtons = [["редактор категорій","редактор к�
                     ["повторити","повторить","retry"],
                     ["вийти","выйти","exit"]]
 
-lang = 0
+lang = []
 
 with open("token.txt") as f:
     TOKEN = f.read().strip()
@@ -51,7 +56,7 @@ with open("wordList.txt", encoding='utf-8', mode='r') as file:
         if '#' in line:
             wordLists.append(line)
 
-@bot.message_handler(commands=['start'])
+@bot.message_handler(commands=['start', 'lang'])
 def start(message):
     global customWordLists
 
@@ -64,42 +69,45 @@ def start(message):
         correctAnswers.append(0)
         buttonText.append([])
         customWordLists.append([])
+        lang.append(1)
         inputEnabled.append(False)
 
     MUID = UID[message.chat.id]
+    inputEnabled[MUID] = False
+    if message.text == "/start":
+        customWordLists[MUID] = []
+        buttons = []
 
-    customWordLists[MUID] = []
-    buttons = []
+        kb1 = types.InlineKeyboardMarkup(row_width=2)
 
-    kb1 = types.InlineKeyboardMarkup(row_width=2)
+        for wordlist in wordLists:
+            buttons.append(types.InlineKeyboardButton(text=f"{wordlist.replace('#', '')}", callback_data=f"{wordlist}"))
 
-    for wordlist in wordLists:
-        buttons.append(types.InlineKeyboardButton(text=f"{wordlist.replace('#', '')}", callback_data=f"{wordlist}"))
+        if (os.path.exists(f"{message.chat.id}.txt")):
+            with open(f"{message.chat.id}.txt", encoding='utf-8', mode='r') as file:
+                for line in file:
+                    if '#' in line:
+                        customWordLists[MUID].append(line.replace("#", "").replace("\n", ""))
+        else:
+            f = open(f"{message.chat.id}.txt", "x")
+            f.close()
 
-    if (os.path.exists(f"{message.chat.id}.txt")):
-        with open(f"{message.chat.id}.txt", encoding='utf-8', mode='r') as file:
-            for line in file:
-                if '#' in line:
-                    customWordLists[MUID].append(line.replace("#", "").replace("\n", ""))
-    else:
-        f = open(f"{message.chat.id}.txt", "x")
-        f.close()
-
-    for wordlist in customWordLists[MUID]:
-        buttons.append(types.InlineKeyboardButton(text=f"{wordlist}", callback_data=f"^{wordlist}"))
-
-    kb1.add(*buttons)
-    kb1.add(types.InlineKeyboardButton(text=f"редактор категорій", callback_data=f"*custom"))
-    bot.send_message(message.chat.id, "обери категорію", reply_markup=kb1)
-
+        for wordlist in customWordLists[MUID]:
+            buttons.append(types.InlineKeyboardButton(text=f"{wordlist}", callback_data=f"^{wordlist}"))
+        kb1.add(*buttons)
+        kb1.add(types.InlineKeyboardButton(text=f"{localizedButtons[0][lang[MUID]]}", callback_data=f"*custom"))
+        bot.send_message(message.chat.id, f"{localizedMessage[0][lang[MUID]]}", reply_markup=kb1)
+    elif message.text == "/lang":
+        kb1 = types.InlineKeyboardMarkup(row_width=3)
+        kb1.add(types.InlineKeyboardButton(text=f"UKR", callback_data="//lang0"),
+                types.InlineKeyboardButton(text=f"RUS", callback_data="//lang1"),
+                types.InlineKeyboardButton(text=f"ENG", callback_data="//lang2"))
+        bot.send_message(message.chat.id, f"{localizedMessage[15][lang[MUID]]}", reply_markup=kb1)
 
 @bot.message_handler()
 def input(message):
     MUID = UID[message.chat.id]
-    if inputEnabled[MUID]:
-        if "/" in message.text:
-            inputEnabled[MUID] = False
-        else:
+    if inputEnabled[MUID] == True:
             text = message.text
             textSplit = str(text).split("\n")
             textFile = open(f"{message.chat.id}.txt", encoding='utf-8', mode='a')
@@ -113,7 +121,7 @@ def input(message):
                         error = "default"
                         break
                 if len(textSplit) < 6 and error == "":
-                    bot.send_message(message.chat.id,"потрібно додати мінімум п\'ять слів")
+                    bot.send_message(message.chat.id,f"{localizedMessage[1][lang[MUID]]}")
                     error = "length"
             else:
                 error = "default"
@@ -122,10 +130,10 @@ def input(message):
                 for word in textSplit:
                     textFile.write(f"\n{word.replace('^', '').replace('%', '').replace('*', '')}")
                 textFile.close()
-                bot.send_message(message.chat.id, "категорія успішно створена")
+                bot.send_message(message.chat.id, f"{localizedMessage[2][lang[MUID]]}")
                 inputEnabled[MUID] = False
             elif error == "default":
-                bot.send_message(message.chat.id,"спробуйте ще раз наприклад:\n#ім\'я категорії\nслово-переклад\nслово-переклад\nслово-переклад\nслово-переклад\nслово-переклад")
+                bot.send_message(message.chat.id,f"{localizedMessage[3][lang[MUID]]}")
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
@@ -145,12 +153,12 @@ def callback_query(call):
 
         if calldata == "custom":
             kb3 = types.InlineKeyboardMarkup(row_width=2)
-            buttons = [types.InlineKeyboardButton(text=f"додати", callback_data=f"*add"), types.InlineKeyboardButton(text=f"видалити", callback_data=f"*remove")]
+            buttons = [types.InlineKeyboardButton(text=f"{localizedButtons[1][lang[CUID]]}", callback_data=f"*add"), types.InlineKeyboardButton(text=f"{localizedButtons[2][lang[CUID]]}", callback_data=f"*remove")]
             kb3.add(*buttons)
 
-            bot.send_message(call.message.chat.id, "редактор категорій", reply_markup=kb3)
+            bot.send_message(call.message.chat.id, f"{localizedMessage[4][lang[CUID]]}", reply_markup=kb3)
         elif calldata == "add":
-            bot.send_message(call.message.chat.id, "напишіть наприклад:\n#ім\'я категорії\nслово-переклад\nслово-переклад\nслово-переклад\nслово-переклад\nслово-переклад")
+            bot.send_message(call.message.chat.id, f"{localizedMessage[5][lang[CUID]]}")
             inputEnabled[CUID] = True
         elif calldata == "remove":
             kb4 = types.InlineKeyboardMarkup(row_width=2)
@@ -159,13 +167,13 @@ def callback_query(call):
                 buttons.append(types.InlineKeyboardButton(text=f"{wordlist}", callback_data=f"*{wordlist}"))
             kb4.add(*buttons)
 
-            bot.send_message(call.message.chat.id, "обери категорію для видалення", reply_markup=kb4)
+            bot.send_message(call.message.chat.id, f"{localizedMessage[6][lang[CUID]]}", reply_markup=kb4)
         elif calldata in customWordLists[CUID]:
             kb5 = types.InlineKeyboardMarkup(row_width=2)
-            kb5.add(types.InlineKeyboardButton(text=f"так", callback_data=f"*%{calldata}"))
-            kb5.add(types.InlineKeyboardButton(text=f"ні", callback_data=f"*N"))
+            kb5.add(types.InlineKeyboardButton(text=f"{localizedButtons[3][lang[CUID]]}", callback_data=f"*%{calldata}"))
+            kb5.add(types.InlineKeyboardButton(text=f"{localizedButtons[4][lang[CUID]]}", callback_data=f"*N"))
 
-            bot.send_message(call.message.chat.id, f"ти точно хочеш видалити категорію {calldata}?", reply_markup=kb5)
+            bot.send_message(call.message.chat.id, f"{localizedMessage[7][lang[CUID]]} {calldata}?", reply_markup=kb5)
         elif "%" in call.data:
             isFound = False
             wasFound = False
@@ -185,13 +193,16 @@ def callback_query(call):
                     if isFound == False:
                         allLines.append(lineA)
                 if wasFound == False:
-                    bot.send_message(call.message.chat.id, f"неможливо знайти {calldata1}")
+                    bot.send_message(call.message.chat.id, f"{localizedMessage[8][lang[CUID]]} {calldata1}")
                 else:
-                    bot.send_message(call.message.chat.id, f"видалено {calldata1}")
+                    bot.send_message(call.message.chat.id, f"{localizedMessage[9][lang[CUID]]} {calldata1}")
                 file.seek(0)
                 file.truncate()
                 file.writelines(allLines)
 
+    elif "//lang" in call.data:
+        lang[CUID] = int(call.data.replace("//lang", ""))
+        
     else:
         if call.data in wordLists or call.data.replace("^", "") in customWordLists[CUID]:
             correctAnswers[CUID] = 0
@@ -234,14 +245,12 @@ def callback_query(call):
             translation[CUID], words[CUID] = zip(*shufleList)
 
             kb6 = types.InlineKeyboardMarkup(row_width=2)
-            btn_types = types.InlineKeyboardButton(text='так', callback_data=f'restart')
-            btn_types2 = types.InlineKeyboardButton(text='ні', callback_data='exit')
-            kb6.add(types.InlineKeyboardButton(text='так', callback_data=f'restart'), types.InlineKeyboardButton(text='ні', callback_data='exit'))
-            msg = f"перегляд слів категорії {call.data.replace('#', '').replace('^', '')}".replace("\n", "")
+            kb6.add(types.InlineKeyboardButton(text=f"{localizedButtons[3][lang[CUID]]}", callback_data=f'restart'), types.InlineKeyboardButton(text=f"{localizedButtons[4][lang[CUID]]}", callback_data='exit'))
+            msg = f"{localizedMessage[11][lang[CUID]]} {call.data.replace('#', '').replace('^', '')}".replace("\n", "")
             msg += "\n"
             for word in words[CUID]:
                 msg += f"{word}\n"
-            msg += "\nпідтвердити вибір?"
+            msg += f"\n{localizedMessage[12][lang[CUID]]}?"
             bot.send_message(call.message.chat.id, msg, reply_markup=kb6)
 
         elif call.data == "exit":
@@ -249,15 +258,15 @@ def callback_query(call):
         else:
             if call.data != "restart" and call.data != str(answerBut[CUID]):
                 print(f"{call.data}-{answerBut[CUID]}")
-                bot.edit_message_text(message_id=call.message.id, chat_id=call.message.chat.id,text=f"не правильно, {words[CUID][wordNumber[CUID]]} - {translation[CUID][wordNumber[CUID]]}")
+                bot.edit_message_text(message_id=call.message.id, chat_id=call.message.chat.id,text=f"{localizedMessage[13][lang[CUID]]}, {words[CUID][wordNumber[CUID]]} - {translation[CUID][wordNumber[CUID]]}")
             if call.data == str(answerBut[CUID]):
-                bot.edit_message_text(message_id=call.message.id, chat_id=call.message.chat.id, text="правильно")
+                bot.edit_message_text(message_id=call.message.id, chat_id=call.message.chat.id, text=f"{localizedMessage[14][lang[CUID]]}")
                 correctAnswers[CUID] += 1
             if wordNumber[CUID] == len(words[CUID]) - 1:
                 kb2 = types.InlineKeyboardMarkup(row_width=2)
-                kb2.add(types.InlineKeyboardButton(text=f"повторити", callback_data=f"restart"))
-                kb2.add(types.InlineKeyboardButton(text=f"вийти", callback_data=f"exit"))
-                bot.send_message(call.message.chat.id, f"вітаю {correctAnswers[CUID]}/{len(translation[CUID])}",reply_markup=kb2)
+                kb2.add(types.InlineKeyboardButton(text=f"{localizedButtons[5][lang[CUID]]}", callback_data=f"restart"))
+                kb2.add(types.InlineKeyboardButton(text=f"{localizedButtons[6][lang[CUID]]}", callback_data=f"exit"))
+                bot.send_message(call.message.chat.id, f"{localizedMessage[10][lang[CUID]]} {correctAnswers[CUID]}/{len(translation[CUID])}",reply_markup=kb2)
                 correctAnswers[CUID] = 0
                 wordNumber[CUID] = -1
             else:
