@@ -16,13 +16,35 @@ buttonText = [[]]
 
 inputEnabled = []
 
+wordLists = []
+customWordLists = [[]]
+
+localizedMessage =[["обери категорію","выбери категорию","choose category"],
+                   ["потрібно додати мінімум п\'ять слів","нужно добавить минимум пять слов","you need to add minimum 5 words"],
+                   ["категорія успішно створена","категория успешно создана","succesfully created category"],
+                   ["помилка спробуйте:\n#ім\'я категорії\nслово-переклад\nслово-переклад\nслово-переклад\nслово-переклад\nслово-переклад","ошибка попробуйте:\n#имя категории\nслово-перевод\nслово-перевод\nслово-перевод\nслово-перевод\nслово-перевод","error try:\nword-translation\nword-translation\nword-translation\nword-translation\nword-translation"],
+                   ["редактор категорій","редактор категорий","category editor"],
+                   ["напишіть наприклад:\n#ім\'я категорії\nслово-переклад\nслово-переклад\nслово-переклад\nслово-переклад\nслово-переклад","напишите например:\n#имя категории\nслово-перевод\nслово-перевод\nслово-перевод\nслово-перевод\nслово-перевод","write for example:\nword-translation\nword-translation\nword-translation\nword-translation\nword-translation"],
+                   ["обери категорію для видалення","выбери категорию для удаления","choose category for deletion"],
+                   ["ти точно хочеш видалити категорію","ты точно хочешь удалить категорию","are you sure you want to delete"],
+                   ["неможливо знайти","невозможно найти","can\'t find"],
+                   ["видалено","удалено","deleted"],
+                   ["вітаю","поздравляю","congratulations"]]
+
+localizedButtons = [["редактор категорій","редактор категорий","category editor"],
+                    ["додати","добавить","add"],
+                    ["видалити","удалить","remove"],
+                    ["так","да","yes"],
+                    ["ні","нет","no"],
+                    ["повторити","повторить","retry"],
+                    ["вийти","выйти","exit"]]
+
+lang = 0
+
 with open("token.txt") as f:
     TOKEN = f.read().strip()
 
 bot = telebot.TeleBot(TOKEN)
-
-wordLists = []
-customWordLists = [[]]
 
 with open("wordList.txt", encoding='utf-8', mode='r') as file:
     for line in file:
@@ -67,8 +89,8 @@ def start(message):
         buttons.append(types.InlineKeyboardButton(text=f"{wordlist}", callback_data=f"^{wordlist}"))
 
     kb1.add(*buttons)
-    kb1.add(types.InlineKeyboardButton(text=f"Wordlist Editor", callback_data=f"*custom"))
-    bot.send_message(message.chat.id, "choose words", reply_markup=kb1)
+    kb1.add(types.InlineKeyboardButton(text=f"редактор категорій", callback_data=f"*custom"))
+    bot.send_message(message.chat.id, "обери категорію", reply_markup=kb1)
 
 
 @bot.message_handler()
@@ -81,51 +103,29 @@ def input(message):
             text = message.text
             textSplit = str(text).split("\n")
             textFile = open(f"{message.chat.id}.txt", encoding='utf-8', mode='a')
-            error = False
+            error = ""
             if "#" in textSplit[0]:
                 i = 0
                 while i < len(textSplit) - 1:
                     i += 1
                     b = textSplit[i].split("-")
                     if len(b) != 2 or "#" in textSplit[i]:
-                        error = True
+                        error = "default"
                         break
+                if len(textSplit) < 6 and error == "":
+                    bot.send_message(message.chat.id,"потрібно додати мінімум п\'ять слів")
+                    error = "length"
             else:
-                error = True
+                error = "default"
 
-            if error == False:
+            if error == "":
                 for word in textSplit:
                     textFile.write(f"\n{word.replace('^', '').replace('%', '').replace('*', '')}")
                 textFile.close()
-                bot.send_message(message.chat.id, "List Created Successfully")
+                bot.send_message(message.chat.id, "категорія успішно створена")
                 inputEnabled[MUID] = False
-            else:
-                bot.send_message(message.chat.id,"Error occured try:\n#listName\nword-translation\nword-translation\nword-translation\nword-translation")
-
-
-@bot.message_handler(commands=['delete'])
-def delete(message):
-    isFound = False
-    wasFound = False
-    allLines = []
-    with open(f"{message.chat.id}.txt", encoding='utf-8', mode='r+') as file:
-        for lineA in file:
-            line = lineA.replace("\n", "")
-            if '#' in line:
-                if str(message.text).replace("/delete ", "") == line:
-                    isFound = True
-                    wasFound = True
-                elif isFound == True:
-                    isFound = False
-                    bot.send_message(message.chat.id,f"successfully deleted {str(message.text).replace('/delete ', '')}")
-            if isFound == False:
-                allLines.append(lineA)
-        if wasFound == False:
-            bot.send_message(message.chat.id, f"can't find {str(message.text).replace('/delete ', '')}")
-        file.seek(0)
-        file.truncate()
-        file.writelines(allLines)
-
+            elif error == "default":
+                bot.send_message(message.chat.id,"спробуйте ще раз наприклад:\n#ім\'я категорії\nслово-переклад\nслово-переклад\nслово-переклад\nслово-переклад\nслово-переклад")
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
@@ -145,12 +145,12 @@ def callback_query(call):
 
         if calldata == "custom":
             kb3 = types.InlineKeyboardMarkup(row_width=2)
-            buttons = [types.InlineKeyboardButton(text=f"add", callback_data=f"*add"), types.InlineKeyboardButton(text=f"remove", callback_data=f"*remove")]
+            buttons = [types.InlineKeyboardButton(text=f"додати", callback_data=f"*add"), types.InlineKeyboardButton(text=f"видалити", callback_data=f"*remove")]
             kb3.add(*buttons)
 
-            bot.send_message(call.message.chat.id, "choose", reply_markup=kb3)
+            bot.send_message(call.message.chat.id, "редактор категорій", reply_markup=kb3)
         elif calldata == "add":
-            bot.send_message(call.message.chat.id, "example:\n#listName\nword-translation\nword-translation\nword-translation\nword-translation")
+            bot.send_message(call.message.chat.id, "напишіть наприклад:\n#ім\'я категорії\nслово-переклад\nслово-переклад\nслово-переклад\nслово-переклад\nслово-переклад")
             inputEnabled[CUID] = True
         elif calldata == "remove":
             kb4 = types.InlineKeyboardMarkup(row_width=2)
@@ -159,13 +159,13 @@ def callback_query(call):
                 buttons.append(types.InlineKeyboardButton(text=f"{wordlist}", callback_data=f"*{wordlist}"))
             kb4.add(*buttons)
 
-            bot.send_message(call.message.chat.id, "choose", reply_markup=kb4)
+            bot.send_message(call.message.chat.id, "обери категорію для видалення", reply_markup=kb4)
         elif calldata in customWordLists[CUID]:
             kb5 = types.InlineKeyboardMarkup(row_width=2)
-            kb5.add(types.InlineKeyboardButton(text=f"Yes", callback_data=f"*%{calldata}"))
-            kb5.add(types.InlineKeyboardButton(text=f"No", callback_data=f"*N"))
+            kb5.add(types.InlineKeyboardButton(text=f"так", callback_data=f"*%{calldata}"))
+            kb5.add(types.InlineKeyboardButton(text=f"ні", callback_data=f"*N"))
 
-            bot.send_message(call.message.chat.id, f"are you sure you want to delete {calldata}", reply_markup=kb5)
+            bot.send_message(call.message.chat.id, f"ти точно хочеш видалити категорію {calldata}?", reply_markup=kb5)
         elif "%" in call.data:
             isFound = False
             wasFound = False
@@ -182,11 +182,12 @@ def callback_query(call):
                             wasFound = True
                         elif isFound == True:
                             isFound = False
-                            bot.send_message(call.message.chat.id,f"successfully deleted {calldata1}")
                     if isFound == False:
                         allLines.append(lineA)
                 if wasFound == False:
-                    bot.send_message(call.message.chat.id, f"can't find {calldata1}")
+                    bot.send_message(call.message.chat.id, f"неможливо знайти {calldata1}")
+                else:
+                    bot.send_message(call.message.chat.id, f"видалено {calldata1}")
                 file.seek(0)
                 file.truncate()
                 file.writelines(allLines)
@@ -233,14 +234,14 @@ def callback_query(call):
             translation[CUID], words[CUID] = zip(*shufleList)
 
             kb6 = types.InlineKeyboardMarkup(row_width=2)
-            btn_types = types.InlineKeyboardButton(text='Yes', callback_data=f'restart')
-            btn_types2 = types.InlineKeyboardButton(text='No', callback_data='exit')
-            kb6.add(btn_types, btn_types2)
-            msg = f"{call.data.replace('#', '').replace('^', '')}".replace("\n", "")
+            btn_types = types.InlineKeyboardButton(text='так', callback_data=f'restart')
+            btn_types2 = types.InlineKeyboardButton(text='ні', callback_data='exit')
+            kb6.add(types.InlineKeyboardButton(text='так', callback_data=f'restart'), types.InlineKeyboardButton(text='ні', callback_data='exit'))
+            msg = f"перегляд слів категорії {call.data.replace('#', '').replace('^', '')}".replace("\n", "")
             msg += "\n"
             for word in words[CUID]:
                 msg += f"{word}\n"
-            msg += "Confirm?"
+            msg += "\nпідтвердити вибір?"
             bot.send_message(call.message.chat.id, msg, reply_markup=kb6)
 
         elif call.data == "exit":
@@ -248,20 +249,18 @@ def callback_query(call):
         else:
             if call.data != "restart" and call.data != str(answerBut[CUID]):
                 print(f"{call.data}-{answerBut[CUID]}")
-                bot.edit_message_text(message_id=call.message.id, chat_id=call.message.chat.id,text=f"incorrect, {words[CUID][wordNumber[CUID]]} - {translation[CUID][wordNumber[CUID]]}")
+                bot.edit_message_text(message_id=call.message.id, chat_id=call.message.chat.id,text=f"не правильно, {words[CUID][wordNumber[CUID]]} - {translation[CUID][wordNumber[CUID]]}")
+            if call.data == str(answerBut[CUID]):
+                bot.edit_message_text(message_id=call.message.id, chat_id=call.message.chat.id, text="правильно")
+                correctAnswers[CUID] += 1
             if wordNumber[CUID] == len(words[CUID]) - 1:
                 kb2 = types.InlineKeyboardMarkup(row_width=2)
-                kb2.add(types.InlineKeyboardButton(text=f"restart", callback_data=f"restart"))
-                kb2.add(types.InlineKeyboardButton(text=f"exit", callback_data=f"exit"))
-                bot.send_message(call.message.chat.id, f"congratulations {correctAnswers[CUID]}/{len(translation[CUID])}",reply_markup=kb2)
+                kb2.add(types.InlineKeyboardButton(text=f"повторити", callback_data=f"restart"))
+                kb2.add(types.InlineKeyboardButton(text=f"вийти", callback_data=f"exit"))
+                bot.send_message(call.message.chat.id, f"вітаю {correctAnswers[CUID]}/{len(translation[CUID])}",reply_markup=kb2)
                 correctAnswers[CUID] = 0
                 wordNumber[CUID] = -1
             else:
-
-                if call.data == str(answerBut[CUID]):
-                    bot.edit_message_text(message_id=call.message.id, chat_id=call.message.chat.id, text="correct")
-                    correctAnswers[CUID] += 1
-
                 wordNumber[CUID] += 1
                 answerBut[CUID] = random.randint(0, 3)
 
