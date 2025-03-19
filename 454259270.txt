@@ -4,3 +4,10 @@ dad-папа
 sister-сестра
 brother-брат
 son-сын
+
+#буква
+letter-буква
+Word-слово
+Sentence-предложение 
+phrase-фраза
+Alphabet-алфавит
