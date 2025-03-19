@@ -296,7 +296,6 @@ def callback_query(call):
             start(call.message)
         else:
             if call.data != "restart" and call.data != str(answerBut[CUID]):
-                print(f"{call.data}-{answerBut[CUID]}")
                 bot.edit_message_text(message_id=call.message.id, chat_id=call.message.chat.id,text=f"{localizedMessage[13][lang[CUID]]}, {words[CUID][wordNumber[CUID]]} - {translation[CUID][wordNumber[CUID]]}")
             if call.data == str(answerBut[CUID]):
                 bot.edit_message_text(message_id=call.message.id, chat_id=call.message.chat.id, text=f"{localizedMessage[14][lang[CUID]]}")
