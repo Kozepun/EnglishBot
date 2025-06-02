@@ -4,10 +4,31 @@ dad-папа
 sister-сестра
 brother-брат
 son-сын
-
 #буква
 letter-буква
 Word-слово
 Sentence-предложение 
 phrase-фраза
 Alphabet-алфавит
+#auto
+house - будинок  
+book - книга  
+water - вода  
+tree - дерево  
+sun - сонце  
+flower - квітка  
+bird - птах  
+car - автомобіль  
+door - двері  
+sky - небо
+#cars
+car - автомобіль  
+engine - двигун  
+wheel - колесо  
+brake - гальмівний систем  
+tire - шина  
+speed - швидкість  
+driver - водій  
+fuel - паливо  
+repair - ремонт  
+passenger - пасажир

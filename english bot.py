@@ -2,6 +2,10 @@ import telebot
 import random
 from telebot import types
 import os
+import ollama
+
+teachers = [990194454]
+admin = 990194454
 
 words = [[]]
 translation = [[]]
@@ -34,7 +38,8 @@ localizedMessage =[["обери категорію","выбери категор
                    ["підтвердити вибір","подтвердить выбор","confirm choice"],
                    ["не правильно","не правильно","incorrect"],
                    ["правильно","правильно","correct"],
-                   ["обери мову","выбери язык","choose language"]]
+                   ["обери мову","выбери язык","choose language"],
+                   ["помилка спробуйте /gen ім'я категорії","ошибка попробуйте /gen имя категории","error try /gen category name"]]
 
 localizedButtons = [["редактор категорій","редактор категорий","category editor"],
                     ["додати","добавить","add"],
@@ -56,7 +61,7 @@ with open("wordList.txt", encoding='utf-8', mode='r') as file:
         if '#' in line:
             wordLists.append(line)
 
-@bot.message_handler(commands=['start', 'lang'])
+@bot.message_handler(commands=['start', 'lang', 'gen'])
 def start(message):
     global customWordLists
 
@@ -82,6 +87,17 @@ def start(message):
                 types.InlineKeyboardButton(text=f"ENG", callback_data="//lang2"))
         bot.send_message(message.chat.id, f"{localizedMessage[15][lang[MUID]]}", reply_markup=kb1)
 
+    elif '/gen' in message.text:
+        if len(message.text.split(" ")) > 1:
+            theme = message.text.replace('/gen ', '')
+            result = ollama.generate(model='qwen3:8b',prompt=f'10 english words with ukrainian translation no numeration no other text theme {theme} \nform: word-translation',think=False)
+            bot.send_message(message.chat.id, localizedMessage[2][lang[MUID]])
+
+            textFile = open(f"{message.chat.id}.txt", encoding='utf-8', mode='a')
+            textFile.write(f"\n#{theme}\n{result['response']}")
+            textFile.close()
+        else:
+            bot.send_message(message.chat.id, localizedMessage[16][lang[MUID]])
     else:
         customWordLists[MUID] = []
         buttons = []
