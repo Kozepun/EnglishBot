@@ -7,6 +7,8 @@ import ollama
 teachers = [990194454]
 admin = 990194454
 
+path = ""
+
 words = [[]]
 translation = [[]]
 
@@ -51,12 +53,12 @@ localizedButtons = [["редактор категорій","редактор к�
 
 lang = []
 
-with open("token.txt") as f:
+with open(f"{path}token.txt") as f:
     TOKEN = f.read().strip()
 
 bot = telebot.TeleBot(TOKEN)
 
-with open("wordList.txt", encoding='utf-8', mode='r') as file:
+with open(f"{path}wordList.txt", encoding='utf-8', mode='r') as file:
     for line in file:
         if '#' in line:
             wordLists.append(line)
@@ -93,7 +95,7 @@ def start(message):
             result = ollama.generate(model='qwen3:8b',prompt=f'10 english words with ukrainian translation no numeration no other text theme {theme} \nform: word-translation',think=False)
             bot.send_message(message.chat.id, localizedMessage[2][lang[MUID]])
 
-            textFile = open(f"{message.chat.id}.txt", encoding='utf-8', mode='a')
+            textFile = open(f"{path}{message.chat.id}.txt", encoding='utf-8', mode='a')
             textFile.write(f"\n#{theme}\n{result['response']}")
             textFile.close()
         else:
@@ -108,12 +110,12 @@ def start(message):
             buttons.append(types.InlineKeyboardButton(text=f"{wordlist.replace('#', '')}", callback_data=f"{wordlist}"))
 
         if (os.path.exists(f"{message.chat.id}.txt")):
-            with open(f"{message.chat.id}.txt", encoding='utf-8', mode='r') as file:
+            with open(f"{path}{message.chat.id}.txt", encoding='utf-8', mode='r') as file:
                 for line in file:
                     if '#' in line:
                         customWordLists[MUID].append(line.replace("#", "").replace("\n", ""))
         else:
-            f = open(f"{message.chat.id}.txt", "x")
+            f = open(f"{path}{message.chat.id}.txt", "x")
             f.close()
 
         for wordlist in customWordLists[MUID]:
@@ -129,7 +131,7 @@ def input(message):
     if inputEnabled[MUID] == True:
             text = message.text
             textSplit = str(text).split("\n")
-            textFile = open(f"{message.chat.id}.txt", encoding='utf-8', mode='a')
+            textFile = open(f"{path}{message.chat.id}.txt", encoding='utf-8', mode='a')
             error = ""
             if "#" in textSplit[0]:
                 i = 0
@@ -203,7 +205,7 @@ def callback_query(call):
                 bot.send_message(call.message.chat.id, f"{localizedMessage[7][lang[CUID]]} {calldata}?", reply_markup=kb5)
             else:
                 isFound = False
-                with open(f"{call.message.chat.id}.txt", encoding='utf-8', mode='r') as file:
+                with open(f"{path}{call.message.chat.id}.txt", encoding='utf-8', mode='r') as file:
                     for line in file:
                         if '#' in line:
                             if call.data.replace("e*", "") == line.strip().replace("#", ""):
@@ -235,7 +237,7 @@ def callback_query(call):
 
             calldata1 = calldata.replace("%", "")
 
-            with open(f"{call.message.chat.id}.txt", encoding='utf-8', mode='r+') as file:
+            with open(f"{path}{call.message.chat.id}.txt", encoding='utf-8', mode='r+') as file:
                 for lineA in file:
                     line = lineA.replace("\n", "")
                     if '#' in line:
@@ -266,7 +268,7 @@ def callback_query(call):
 
             isFound = False
             if "^" not in call.data:
-                with open("wordList.txt", encoding='utf-8', mode='r') as file:
+                with open(f"{path}wordList.txt", encoding='utf-8', mode='r') as file:
                     for line in file:
                         if '#' in line:
                             if call.data == line:
@@ -279,7 +281,7 @@ def callback_query(call):
                             translation[CUID].append(p[1])
 
             else:
-                with open(f"{call.message.chat.id}.txt", encoding='utf-8', mode='r') as file:
+                with open(f"{path}{call.message.chat.id}.txt", encoding='utf-8', mode='r') as file:
                     for line in file:
                         if '#' in line:
                             if call.data.replace("^", "") == line.strip().replace("#", ""):
