@@ -4,6 +4,7 @@ from telebot import types
 import os
 import ollama
 
+groups = ["test"]
 teachers = [990194454]
 admin = 990194454
 
@@ -41,7 +42,9 @@ localizedMessage =[["обери категорію","выбери категор
                    ["не правильно","не правильно","incorrect"],
                    ["правильно","правильно","correct"],
                    ["обери мову","выбери язык","choose language"],
-                   ["помилка спробуйте /gen ім'я категорії","ошибка попробуйте /gen имя категории","error try /gen category name"]]
+                   ["помилка спробуйте /gen ім'я категорії","ошибка попробуйте /gen имя категории","error try /gen category name"],
+                   ["ви приєднались до групи", "вы присоединились к групе", "you joined group"],
+                   ["ця група не існує","эта група не существует","this group doesn't exist"]]
 
 localizedButtons = [["редактор категорій","редактор категорий","category editor"],
                     ["додати","добавить","add"],
@@ -63,7 +66,21 @@ with open(f"{path}wordList.txt", encoding='utf-8', mode='r') as file:
         if '#' in line:
             wordLists.append(line)
 
-@bot.message_handler(commands=['start', 'lang', 'gen'])
+with open(f"{path}userdata.txt", encoding='utf-8', mode='r') as file:
+    for line in file:
+        l = str(line).split("-")
+        UID.update({int(l[0]): len(UID)})
+        words.append([])
+        translation.append([])
+        wordNumber.append(-1)
+        answerBut.append(0)
+        correctAnswers.append(0)
+        buttonText.append([])
+        customWordLists.append([])
+        lang.append(0)
+        inputEnabled.append(False)
+
+@bot.message_handler(commands=['start', 'lang', 'gen', 'joingroup', 'hw'])
 def start(message):
     global customWordLists
 
@@ -78,6 +95,9 @@ def start(message):
         customWordLists.append([])
         lang.append(0)
         inputEnabled.append(False)
+
+        userdatafile = open(f"{path}userdata.txt", encoding='utf8', mode='a')
+        userdatafile.write(f"{message.chat.id}-0-N\n")
 
     MUID = UID[message.chat.id]
     inputEnabled[MUID] = False
@@ -100,6 +120,32 @@ def start(message):
             textFile.close()
         else:
             bot.send_message(message.chat.id, localizedMessage[16][lang[MUID]])
+    elif '/joingroup' in message.text:
+        splitText = message.text.split(" ")
+        if len(splitText) == 2:
+            if(splitText[1] in groups):
+                alllines = []
+
+                with open(f"{path}userdata.txt", encoding='utf-8', mode='r+') as file:
+                    for line in file:
+                        if str(message.chat.id) in line:
+                            splline = line.split('-')
+                            alllines.append(f"{splline[0]}-{splline[1]}-{splitText[1]}\n")
+                        else:
+                            alllines.append(line)
+                    file.seek(0)
+                    file.truncate()
+                    file.writelines(alllines)
+                    bot.send_message(message.chat.id, f"{localizedMessage[17][lang[MUID]]} {splitText[1]}")
+            else:
+                bot.send_message(message.chat.id, localizedMessage[18][lang[MUID]])
+    elif message.text == '/hw':
+        buttons = []
+        kb1 = types.InlineKeyboardMarkup(row_width=2)
+        for group in groups:
+            buttons.append(types.InlineKeyboardButton(text=group, callback_data=f"?||?choice-{group}"))
+        kb1.add(*buttons)
+        bot.send_message(message.chat.id, "choose group", reply_markup=kb1)
     else:
         customWordLists[MUID] = []
         buttons = []
@@ -109,7 +155,7 @@ def start(message):
         for wordlist in wordLists:
             buttons.append(types.InlineKeyboardButton(text=f"{wordlist.replace('#', '')}", callback_data=f"{wordlist}"))
 
-        if (os.path.exists(f"{message.chat.id}.txt")):
+        if (os.path.exists(f"{path}{message.chat.id}.txt")):
             with open(f"{path}{message.chat.id}.txt", encoding='utf-8', mode='r') as file:
                 for line in file:
                     if '#' in line:
@@ -255,6 +301,44 @@ def callback_query(call):
                 file.seek(0)
                 file.truncate()
                 file.writelines(allLines)
+    elif "?||?" in call.data:
+        kb1 = types.InlineKeyboardMarkup(row_width=2)
+        buttons = []
+        if "?||?choice" in call.data:
+            with open(f"{path}{call.message.chat.id}.txt", encoding='utf-8', mode='r') as file:
+                for line in file:
+                    if '#' in line:
+                        l = line.replace("#", "").replace("\n", "")
+                        buttons.append(types.InlineKeyboardButton(text=l,callback_data=f'?||?add-{l}-{call.data.replace("?||?choice-", "")}'))
+
+            kb1.add(*buttons)
+            bot.send_message(call.message.chat.id, "choose category", reply_markup=kb1)
+        elif "?||?add" in call.data:
+
+            isFound = False
+            listToShare = ""
+            with open(f"{path}{call.message.chat.id}.txt", encoding='utf-8', mode='r') as file:
+                for line in file:
+                    if '#' in line:
+                        if  call.data.split("-")[1].replace("#", "") == line.strip().replace("#", ""):
+                            isFound = True
+                            listToShare += f"\n{line.strip()}"
+                        elif isFound == True:
+                            break
+                    elif isFound:
+                        listToShare += f"\n{line.strip()}"
+
+            with open(f"{path}userdata.txt", encoding='utf-8', mode='r') as file:
+                for line in file:
+                    ls = line.split("-")
+                    if ls[2] == call.data.split("-")[2]:
+                        bot.send_message(ls[0], f"you have a homework")
+
+                        with open(f"{path}{ls[0]}.txt", encoding='utf-8', mode='a') as file:
+                            file.write(listToShare)
+
+
+
 
     elif "//lang" in call.data:
         lang[CUID] = int(call.data.replace("//lang", ""))
