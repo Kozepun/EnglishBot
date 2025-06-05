@@ -5,8 +5,8 @@ import os
 import ollama
 
 groups = ["test"]
-teachers = [990194454]
-admin = 990194454
+teachers = []
+admins = []
 
 path = ""
 
@@ -44,7 +44,12 @@ localizedMessage =[["обери категорію","выбери категор
                    ["обери мову","выбери язык","choose language"],
                    ["помилка спробуйте /gen ім'я категорії","ошибка попробуйте /gen имя категории","error try /gen category name"],
                    ["ви приєднались до групи", "вы присоединились к групе", "you joined group"],
-                   ["ця група не існує","эта група не существует","this group doesn't exist"]]
+                   ["ця група не існує","эта група не существует","this group doesn't exist"],
+                   ["обери завдання","выбери задание","choose task"],
+                   ["помилка спробуйте /hw назва групи","ошибка попробуйте /hw название групы","error try /hw group name"],
+                   ["у вас є нове завдання","у вас есть новое задание","you have a new task"],
+                   ["завдання надіслано","задание отослано","the task has been sent"],
+                   ["у вас немає доступу","у вас нет доступа","you don't have access"]]
 
 localizedButtons = [["редактор категорій","редактор категорий","category editor"],
                     ["додати","добавить","add"],
@@ -79,6 +84,12 @@ with open(f"{path}userdata.txt", encoding='utf-8', mode='r') as file:
         customWordLists.append([])
         lang.append(0)
         inputEnabled.append(False)
+        if int(l[1]) > 0:
+            teachers.append(int(l[0]))
+            print(teachers)
+            if int(l[1]) > 1:
+                admins.append(int(l[0]))
+                print(admins)
 
 @bot.message_handler(commands=['start', 'lang', 'gen', 'joingroup', 'hw'])
 def start(message):
@@ -139,13 +150,31 @@ def start(message):
                     bot.send_message(message.chat.id, f"{localizedMessage[17][lang[MUID]]} {splitText[1]}")
             else:
                 bot.send_message(message.chat.id, localizedMessage[18][lang[MUID]])
-    elif message.text == '/hw':
-        buttons = []
-        kb1 = types.InlineKeyboardMarkup(row_width=2)
-        for group in groups:
-            buttons.append(types.InlineKeyboardButton(text=group, callback_data=f"?||?choice-{group}"))
-        kb1.add(*buttons)
-        bot.send_message(message.chat.id, "choose group", reply_markup=kb1)
+    elif '/hw' in message.text:
+        if message.chat.id in teachers:
+            spl = message.text.split(" ")
+
+            buttons = []
+            kb1 = types.InlineKeyboardMarkup(row_width=2)
+
+            if len(spl) == 2:
+                if spl[1] in groups:
+                    with open(f"{path}{message.chat.id}.txt", encoding='utf-8', mode='r') as file:
+                        for line in file:
+                            if '#' in line:
+                                l = line.replace("#", "").replace("\n", "")
+                                buttons.append(types.InlineKeyboardButton(text=l,callback_data=f'?||?add-{l}-{spl[1]}'))
+
+                    kb1.add(*buttons)
+                    bot.send_message(message.chat.id, localizedMessage[19][lang[MUID]], reply_markup=kb1)
+                else:
+                    bot.send_message(message.chat.id, localizedMessage[18][lang[MUID]])
+            else:
+                bot.send_message(message.chat.id, localizedMessage[20][lang[MUID]])
+        else:
+            bot.send_message(message.chat.id, localizedMessage[23][lang[MUID]])
+
+
     else:
         customWordLists[MUID] = []
         buttons = []
@@ -302,43 +331,28 @@ def callback_query(call):
                 file.truncate()
                 file.writelines(allLines)
     elif "?||?" in call.data:
-        kb1 = types.InlineKeyboardMarkup(row_width=2)
-        buttons = []
-        if "?||?choice" in call.data:
-            with open(f"{path}{call.message.chat.id}.txt", encoding='utf-8', mode='r') as file:
-                for line in file:
-                    if '#' in line:
-                        l = line.replace("#", "").replace("\n", "")
-                        buttons.append(types.InlineKeyboardButton(text=l,callback_data=f'?||?add-{l}-{call.data.replace("?||?choice-", "")}'))
-
-            kb1.add(*buttons)
-            bot.send_message(call.message.chat.id, "choose category", reply_markup=kb1)
-        elif "?||?add" in call.data:
-
-            isFound = False
-            listToShare = ""
-            with open(f"{path}{call.message.chat.id}.txt", encoding='utf-8', mode='r') as file:
-                for line in file:
-                    if '#' in line:
-                        if  call.data.split("-")[1].replace("#", "") == line.strip().replace("#", ""):
-                            isFound = True
-                            listToShare += f"\n{line.strip()}"
-                        elif isFound == True:
-                            break
-                    elif isFound:
+        isFound = False
+        listToShare = ""
+        with open(f"{path}{call.message.chat.id}.txt", encoding='utf-8', mode='r') as file:
+            for line in file:
+                if '#' in line:
+                    if call.data.split("-")[1].replace("#", "") == line.strip().replace("#", ""):
+                        isFound = True
                         listToShare += f"\n{line.strip()}"
+                    elif isFound == True:
+                        break
+                elif isFound:
+                    listToShare += f"\n{line.strip()}"
 
-            with open(f"{path}userdata.txt", encoding='utf-8', mode='r') as file:
-                for line in file:
-                    ls = line.split("-")
-                    if ls[2] == call.data.split("-")[2]:
-                        bot.send_message(ls[0], f"you have a homework")
+        with open(f"{path}userdata.txt", encoding='utf-8', mode='r') as file:
+            for line in file:
+                ls = line.split("-")
+                if ls[2].replace('\n', '') == call.data.split("-")[2]:
+                    bot.send_message(ls[0], localizedMessage[21][lang[CUID]])
 
-                        with open(f"{path}{ls[0]}.txt", encoding='utf-8', mode='a') as file:
-                            file.write(listToShare)
-
-
-
+                    with open(f"{path}{ls[0]}.txt", encoding='utf-8', mode='a') as file:
+                        file.write(listToShare)
+        bot.send_message(call.message.chat.id, localizedMessage[22][lang[CUID]])
 
     elif "//lang" in call.data:
         lang[CUID] = int(call.data.replace("//lang", ""))
