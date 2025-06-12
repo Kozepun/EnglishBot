@@ -1,10 +1,17 @@
 import telebot
 import random
 from telebot import types
-import os
 import ollama
+from pymongo import MongoClient
+from deep_translator import GoogleTranslator
 
-groups = ["test"]
+client = MongoClient("mongodb://localhost:27017/")
+db = client["mydatabase"]
+users = db["users"]
+groupsdb = db["groups"]
+
+
+groups = []
 teachers = []
 admins = []
 
@@ -71,27 +78,29 @@ with open(f"{path}wordList.txt", encoding='utf-8', mode='r') as file:
         if '#' in line:
             wordLists.append(line)
 
-with open(f"{path}userdata.txt", encoding='utf-8', mode='r') as file:
-    for line in file:
-        l = str(line).split("-")
-        UID.update({int(l[0]): len(UID)})
-        words.append([])
-        translation.append([])
-        wordNumber.append(-1)
-        answerBut.append(0)
-        correctAnswers.append(0)
-        buttonText.append([])
-        customWordLists.append([])
-        lang.append(0)
-        inputEnabled.append(False)
-        if int(l[1]) > 0:
-            teachers.append(int(l[0]))
-            print(teachers)
-            if int(l[1]) > 1:
-                admins.append(int(l[0]))
-                print(admins)
+for user in users.find():
+    level = user["level"]
+    id = user["_id"]
+    lang.append(user["lang"])
 
-@bot.message_handler(commands=['start', 'lang', 'gen', 'joingroup', 'hw'])
+    UID.update({id: len(UID)})
+    words.append([])
+    translation.append([])
+    wordNumber.append(-1)
+    answerBut.append(0)
+    correctAnswers.append(0)
+    buttonText.append([])
+    customWordLists.append([])
+
+    inputEnabled.append(False)
+    if level > 0:
+        teachers.append(id)
+        if level > 1:
+            admins.append(id)
+
+for group in groupsdb.find({}):
+    groups.append(group["group"])
+@bot.message_handler(commands=['start', 'lang', 'gen', 'joingroup', 'hw', 'newgroup', 'req', 'promote', ])
 def start(message):
     global customWordLists
 
@@ -107,8 +116,7 @@ def start(message):
         lang.append(0)
         inputEnabled.append(False)
 
-        userdatafile = open(f"{path}userdata.txt", encoding='utf8', mode='a')
-        userdatafile.write(f"{message.chat.id}-0-N\n")
+        users.insert_one({"_id": message.chat.id, "level": 0, "lang": 0, "group": "", "wordlists": [], "words": [], "translations": []})
 
     MUID = UID[message.chat.id]
     inputEnabled[MUID] = False
@@ -119,35 +127,56 @@ def start(message):
                 types.InlineKeyboardButton(text=f"RUS", callback_data="//lang1"),
                 types.InlineKeyboardButton(text=f"ENG", callback_data="//lang2"))
         bot.send_message(message.chat.id, f"{localizedMessage[15][lang[MUID]]}", reply_markup=kb1)
+    elif '/req' in message.text:
+        for user in users.find({"level" : 2}):
+            bot.send_message(user["_id"], f"/promote {message.chat.id} 1")
+    elif '/promote' in message.text:
+        for user in users.find({"_id" : message.chat.id}):
+            if user["level"] == 2:
+                textSplit = message.text.split(" ")
+                print(textSplit[1])
+                myQuery = {"_id" : int(textSplit[1])}
+                newvalues = {"$set": {"level" : int(textSplit[2])}}
+                users.update_one(myQuery, newvalues)
 
     elif '/gen' in message.text:
         if len(message.text.split(" ")) > 1:
             theme = message.text.replace('/gen ', '')
-            result = ollama.generate(model='qwen3:8b',prompt=f'10 english words with ukrainian translation no numeration no other text theme {theme} \nform: word-translation',think=False)
-            bot.send_message(message.chat.id, localizedMessage[2][lang[MUID]])
 
-            textFile = open(f"{path}{message.chat.id}.txt", encoding='utf-8', mode='a')
-            textFile.write(f"\n#{theme}\n{result['response']}")
-            textFile.close()
+            myquery = {"_id": message.chat.id}
+
+            dwords = []
+            dtrans = []
+
+            response = ollama.generate(model='qwen3:4b',prompt=f'10 english words NO NUMERATION no other text each from new line theme {theme}',think=False)
+
+            english_words = response["response"].replace("\n", ",")
+
+            ukrainian_words = GoogleTranslator(source='en', target='uk').translate(english_words).split(",")
+
+            for en, uk in zip(english_words.split(","), ukrainian_words):
+                dwords.append(en.strip())
+                dtrans.append(uk.strip())
+
+            newvalues = {"$push": {"words": dwords, "translations": dtrans, "wordlists": theme}}
+
+            users.update_one(myquery, newvalues)
+
+            bot.send_message(message.chat.id, f"{localizedMessage[2][lang[MUID]]}")
+
+
+
         else:
             bot.send_message(message.chat.id, localizedMessage[16][lang[MUID]])
     elif '/joingroup' in message.text:
         splitText = message.text.split(" ")
         if len(splitText) == 2:
             if(splitText[1] in groups):
-                alllines = []
+                bot.send_message(message.chat.id, f"{localizedMessage[17][lang[MUID]]} {splitText[1]}")
+                myquery = {"_id": message.chat.id}
+                newvalues = {"$set": {"group": splitText[1]}}
 
-                with open(f"{path}userdata.txt", encoding='utf-8', mode='r+') as file:
-                    for line in file:
-                        if str(message.chat.id) in line:
-                            splline = line.split('-')
-                            alllines.append(f"{splline[0]}-{splline[1]}-{splitText[1]}\n")
-                        else:
-                            alllines.append(line)
-                    file.seek(0)
-                    file.truncate()
-                    file.writelines(alllines)
-                    bot.send_message(message.chat.id, f"{localizedMessage[17][lang[MUID]]} {splitText[1]}")
+                users.update_one(myquery, newvalues)
             else:
                 bot.send_message(message.chat.id, localizedMessage[18][lang[MUID]])
     elif '/hw' in message.text:
@@ -159,11 +188,9 @@ def start(message):
 
             if len(spl) == 2:
                 if spl[1] in groups:
-                    with open(f"{path}{message.chat.id}.txt", encoding='utf-8', mode='r') as file:
-                        for line in file:
-                            if '#' in line:
-                                l = line.replace("#", "").replace("\n", "")
-                                buttons.append(types.InlineKeyboardButton(text=l,callback_data=f'?||?add-{l}-{spl[1]}'))
+                    for user in users.find({"_id": message.chat.id}):
+                        for wl in user["wordlists"]:
+                            buttons.append(types.InlineKeyboardButton(text=wl, callback_data=f'?||?add-{wl}-{spl[1]}'))
 
                     kb1.add(*buttons)
                     bot.send_message(message.chat.id, localizedMessage[19][lang[MUID]], reply_markup=kb1)
@@ -173,8 +200,14 @@ def start(message):
                 bot.send_message(message.chat.id, localizedMessage[20][lang[MUID]])
         else:
             bot.send_message(message.chat.id, localizedMessage[23][lang[MUID]])
+    elif "/newgroup" in message.text:
+        for user in users.find({"_id": message.chat.id}):
+            if user["level"] == 2:
+                splitText = message.text.split(" ")
+                groupsdb.insert_one({"group": splitText[1]})
+                groups.append(splitText[1])
 
-
+                bot.send_message(message.chat.id, f"ok")
     else:
         customWordLists[MUID] = []
         buttons = []
@@ -184,17 +217,11 @@ def start(message):
         for wordlist in wordLists:
             buttons.append(types.InlineKeyboardButton(text=f"{wordlist.replace('#', '')}", callback_data=f"{wordlist}"))
 
-        if (os.path.exists(f"{path}{message.chat.id}.txt")):
-            with open(f"{path}{message.chat.id}.txt", encoding='utf-8', mode='r') as file:
-                for line in file:
-                    if '#' in line:
-                        customWordLists[MUID].append(line.replace("#", "").replace("\n", ""))
-        else:
-            f = open(f"{path}{message.chat.id}.txt", "x")
-            f.close()
+        for user in users.find({"_id":message.chat.id}):
+            customWordLists[MUID] = user["wordlists"]
+            for wordlist in customWordLists[MUID]:
+                buttons.append(types.InlineKeyboardButton(text=f"{wordlist}", callback_data=f"^{wordlist}"))
 
-        for wordlist in customWordLists[MUID]:
-            buttons.append(types.InlineKeyboardButton(text=f"{wordlist}", callback_data=f"^{wordlist}"))
         kb1.add(*buttons)
         kb1.add(types.InlineKeyboardButton(text=f"{localizedButtons[0][lang[MUID]]}", callback_data=f"*custom"))
         bot.send_message(message.chat.id, f"{localizedMessage[0][lang[MUID]]}", reply_markup=kb1)
@@ -206,7 +233,6 @@ def input(message):
     if inputEnabled[MUID] == True:
             text = message.text
             textSplit = str(text).split("\n")
-            textFile = open(f"{path}{message.chat.id}.txt", encoding='utf-8', mode='a')
             error = ""
             if "#" in textSplit[0]:
                 i = 0
@@ -223,11 +249,27 @@ def input(message):
                 error = "default"
 
             if error == "":
-                for word in textSplit:
-                    textFile.write(f"\n{word.replace('^', '').replace('%', '').replace('*', '')}")
-                textFile.close()
+                myquery = {"_id": message.chat.id}
+
+                awords = []
+                atrans = []
+
+                for w in textSplit:
+                    if "#" in w:
+                        newvalues = {"$push": {"wordlists": w.replace("#","")}}
+                        users.update_one(myquery, newvalues)
+                    else:
+                        awords.append(w.split("-")[0])
+                        atrans.append(w.split("-")[1])
+
+
+                newvalues = {"$push": {"words": awords, "translations": atrans}}
+
+                users.update_one(myquery, newvalues)
+
                 bot.send_message(message.chat.id, f"{localizedMessage[2][lang[MUID]]}")
-                inputEnabled[MUID] = False
+
+
             elif error == "default":
                 bot.send_message(message.chat.id,f"{localizedMessage[3][lang[MUID]]}")
 
@@ -306,56 +348,59 @@ def callback_query(call):
             kb7.add(types.InlineKeyboardButton(text=f"edt", callback_data="52"))
             bot.send_message(call.message.chat.id, f"what word do you want to edit", reply_markup=kb7)
         elif "%" in call.data:
-            isFound = False
-            wasFound = False
-            allLines = []
-
             calldata1 = calldata.replace("%", "")
 
-            with open(f"{path}{call.message.chat.id}.txt", encoding='utf-8', mode='r+') as file:
-                for lineA in file:
-                    line = lineA.replace("\n", "")
-                    if '#' in line:
-                        if calldata1 == line.replace("#", ""):
-                            isFound = True
-                            wasFound = True
-                        elif isFound == True:
-                            isFound = False
-                    if isFound == False:
-                        allLines.append(lineA)
-                if wasFound == False:
-                    bot.send_message(call.message.chat.id, f"{localizedMessage[8][lang[CUID]]} {calldata1}")
-                else:
+            for user in users.find({"_id": call.message.chat.id}):
+                if calldata1 in user["wordlists"]:
+
+
+                    newLists = []
+                    newWords = []
+                    newTrans = []
+
+                    i = 0
+                    while i < len(user["wordlists"]):
+                        if user["wordlists"][i] != calldata1:
+                            newLists.append(user["wordlists"][i])
+                            newWords.append(user["words"][i])
+                            newTrans.append(user["translations"][i])
+                        i += 1
+
+
+                    myquery = {"_id": call.message.chat.id}
+                    newvalues = {"$set": {"words": newWords, "translations": newTrans, "wordlists": newLists}}
+                    users.update_one(myquery, newvalues)
                     bot.send_message(call.message.chat.id, f"{localizedMessage[9][lang[CUID]]} {calldata1}")
-                file.seek(0)
-                file.truncate()
-                file.writelines(allLines)
+                else:
+                    bot.send_message(call.message.chat.id, f"{localizedMessage[8][lang[CUID]]} {calldata1}")
     elif "?||?" in call.data:
-        isFound = False
-        listToShare = ""
-        with open(f"{path}{call.message.chat.id}.txt", encoding='utf-8', mode='r') as file:
-            for line in file:
-                if '#' in line:
-                    if call.data.split("-")[1].replace("#", "") == line.strip().replace("#", ""):
-                        isFound = True
-                        listToShare += f"\n{line.strip()}"
-                    elif isFound == True:
-                        break
-                elif isFound:
-                    listToShare += f"\n{line.strip()}"
+        for user in users.find({"_id": call.message.chat.id}):
+            shareListName = call.data.split("-")[1]
 
-        with open(f"{path}userdata.txt", encoding='utf-8', mode='r') as file:
-            for line in file:
-                ls = line.split("-")
-                if ls[2].replace('\n', '') == call.data.split("-")[2]:
-                    bot.send_message(ls[0], localizedMessage[21][lang[CUID]])
+            i = user["wordlists"].index(shareListName)
 
-                    with open(f"{path}{ls[0]}.txt", encoding='utf-8', mode='a') as file:
-                        file.write(listToShare)
+            shareListWords = user["words"][i]
+            shareListTrans = user["translations"][i]
+
+            myquery = {"group": call.data.split("-")[2]}
+
+            newvalues = {"$push": {"words": shareListWords, "translations": shareListTrans, "wordlists" : shareListName}}
+
+            users.update_many(myquery, newvalues)
+
+            for user1 in users.find(myquery):
+                bot.send_message(user1["_id"], localizedMessage[21][lang[CUID]])
+
         bot.send_message(call.message.chat.id, localizedMessage[22][lang[CUID]])
 
     elif "//lang" in call.data:
         lang[CUID] = int(call.data.replace("//lang", ""))
+
+        myquery = {"_id": call.message.chat.id}
+        newvalues = {"$set": {"lang": lang[CUID]}}
+
+        users.update_many(myquery, newvalues)
+
         start(call.message)
     else:
         if call.data in wordLists or call.data.replace("^", "") in customWordLists[CUID]:
@@ -379,17 +424,11 @@ def callback_query(call):
                             translation[CUID].append(p[1])
 
             else:
-                with open(f"{path}{call.message.chat.id}.txt", encoding='utf-8', mode='r') as file:
-                    for line in file:
-                        if '#' in line:
-                            if call.data.replace("^", "") == line.strip().replace("#", ""):
-                                isFound = True
-                            elif isFound == True:
-                                break
-                        elif isFound:
-                            p = line.strip().split("-")
-                            words[CUID].append(p[0])
-                            translation[CUID].append(p[1])
+
+                for user in users.find({"_id": call.message.chat.id}):
+                    Listindex = user["wordlists"].index(call.data.replace("^", ""))
+                    words[CUID] = user["words"][Listindex]
+                    translation[CUID] = user["translations"][Listindex]
 
             timedtranslation = tuple(translation[CUID])
             timedwords = tuple(words[CUID])
